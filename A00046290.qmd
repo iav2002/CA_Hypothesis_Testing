@@ -1,0 +1,10 @@
+---
+title: "CA!"
+format: html
+editor: visual
+toc: true 
+---
+
+# Football Salaries
+
+## 1. Introduction
