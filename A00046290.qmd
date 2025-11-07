@@ -1,10 +1,396 @@
 ---
-title: "CA!"
-format: html
-editor: visual
-toc: true 
+title: "Football Players Salaries"
+subtitle: "Prob. & Statistical Inference - MATH9102"
+author: "A00046290 - Ignacio Alarcon Varela"
+format:
+  html:
+    self-contained: true
+    code-fold: true
+    code-tools: true
+    toc: true
+    editor: source
 ---
 
-# Football Salaries
+------------------------------------------------------------------------
+
+```{=html}
+<style>
+/* Center figure captions in Quarto HTML, make them black and bold */
+.quarto-figure .figure-caption,
+figure > figcaption {
+  text-align: center;
+  color: black;
+  font-weight: bold;
+}
+
+/* Improments and justified */
+body {
+  text-align: justify;   
+  line-height: 1.3;      
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+}
+p {
+  margin-bottom: 1em;    /* adds space between paragraphs */
+}
+</style>
+```
+
+Importing Libraries
+
+```{r}
+# Loading all libraries
+quiet_library <- function(pkg) {
+  suppressMessages(suppressWarnings({
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      install.packages(pkg, quiet = TRUE)
+    }
+    library(pkg, character.only = TRUE)
+  }))
+}
+quiet_library("tidyverse") 
+# Collection of R packages (dplyr, ggplot2, tidyr, etc.) for data wrangling, visualization, and analysis
+
+quiet_library("pastecs")  
+# Tools for descriptive statistics, time series analysis, and data exploration (e.g., stat.desc)
+
+quiet_library("psych")   # Descriptive statistics by group
+
+quiet_library("FSA")  
+# Includes general tools for data analysis (e.g., nonparametric tests, bootstrapping)
+
+quiet_library("semTools")  
+# Supplementary functions for Structural Equation Modeling (SEM), including model fit, reliability, and measurement invariance tests
+
+quiet_library("VIM") # Visualization and Imputation of Missing Values
+
+quiet_library("naniar") #(naniar short for NA + naniar) - Missing data wrangling plus Little's test
+
+quiet_library("simputation") # For imputing variables
+quiet_library("sjstats")  # Provides convenient functions for effect sizes
+
+quiet_library("gmodels")  # Includes 'CrossTable()' for contingency tables.
+
+quiet_library("car")   # Includes Levene's test for homogeneity
+quiet_library("effectsize")  # Effect size calculations (Cohen’s d, η², Cramer’s V, etc.)
+quiet_library("rstatix")     # Easy-to-use t-tests, ANOVA, nonparametric tests, post-hoc, etc.
+
+quiet_library("gridExtra") # To arrange visualizations. 
+quiet_library("gtsummary") # Formatting tables
+quiet_library("flextable") # Formatting tables
+```
+
+Setup for dataset
+
+```{r}
+# datalocation <- file.path("C:","Users", "deirdre.lawless", "downloads") # in case you might want to run 
+
+# Folder Direction
+datalocation <- file.path("/Users/ignacioalarconvarela/developer/CA-Statistics")
+datapath <- file.path(datalocation, "raw_wages.csv")
+wages <- read.csv("raw_wages.csv", header = TRUE)
+colnames(wages) <- tolower(colnames(wages)) #Setting the column names to be in the Dataset
+
+wages_cleaned <- readRDS("wages_cleaned.rds") #cleaned dataset to be able to render
+
+```
 
 ## 1. Introduction
+
+Professional football presents one of the most unequal wage structures in sport, with a small number of elite players earning disproportionately higher salaries. This report analyses data from a large public dataset (Yash, 2024) compiled from the *Football Manager* database, which contains realistic, web-scraped information on over 40,000 players worldwide. The dataset includes variables such as player age, nationality, EU status, league, total appearances, national caps, current reputation, salary and many more.
+
+The purpose of this analysis is to examine how player performance and demographic factors relate to salary levels in professional football. Specifically, the study investigates whether indicators of skill and experience like reputation, appearances, or international exposure are statistically associated with salary, and whether meaningful pay differences exist between European and non European players or across competitive leagues.
+
+To address these aims, four hypotheses were developed (see Table 1). Each hypothesis explores a specific type of relationship, enabling the application of different inferential tests based on variable type and distribution.
+
+::: table
+**Table 1. Research Hypotheses for Planned Analysis**
+
+| **Analysis Focus** | **Null Hypothesis (H₀)** | **Alternative Hypothesis (H₁)** |
+|------------------|------------------------|------------------------------|
+| **Current Reputation and Salary** | A player’s current reputation is **not related** to their salary. | A player’s current reputation is **positively related** to their salary. |
+| **EU Status and Salary** | Being an EU player **does not affect** a player’s salary. | Being an EU player **does affect** a player’s salary. |
+| **League and Salary** | Average salaries **do not differ** across football leagues. | Average salaries **differ** across football leagues. |
+| **EU Status and High Salary** | EU status and being a high earning player are unrelated . | EU status and being a high-earning player are **related**. |
+:::
+
+Section 2 describes the dataset and data preparation steps, including missing value treatment, variable cleaning, and normality assessment. Section 3 outlines the analytic approach, detailing the statistical rationale and effect size conventions. Section 4 presents the results by hypothesis, followed by discussion and conclusions in Sections 5 and 6.
+
+## 2. Dataset - Exploratory Data Analysis
+
+To understand our hypothesis and what we want to achieve, we need to explore our data set. Initially, checking for missing values is key. The standard missing value check `sum(is.na(wages)`) returned zero missing observations across all variables.
+
+```{r}
+dim(wages) #check dimmensions
+sum(is.na(wages)) #check for missing values  
+```
+
+```{r}
+head(wages, 2)
+```
+
+However, after manual inspection of the raw CSV revealed that several fields contained space-only entries or placeholders such as `"–"` or `"--"`, which R does not automatically interpret as missing. This might be caused since the dataset was scrapped from a Football Manager website according to the author. Therefore to address this, these were programmatically converted to `NA` values prior to further analysis.
+
+```{r}
+# Correcting invisible blanks and dashes
+wages <- wages %>%
+  mutate(across(where(is.character), ~ {
+    x <- gsub("\u00A0", " ", .)
+    x <- trimws(x)
+    x[x %in% c("", "-", "--", "- -")] <- NA
+    x
+  }))
+
+# Re-check missing values
+colSums(is.na(wages))
+```
+
+Following the identification of missing values, several variables were removed due to either excessive missing data or limited analytic relevance. Columns such as *Club*, *Position*, *Based*, *Begins*, *Expires*, *Last Club*, and *Last Transfer Fee* were excluded, as they contained mostly incomplete or redundant information.
+
+The remaining variables were then renamed for clarity and consistency. For instance, *Division* was renamed *League*, *Nat* to *Nationality*, *EU National* to *EU Player*, *Caps* to *National Caps*, *At.Apps* to *Total Apps*, and *Cr* to *Current Reputation*. These changes ensured that variable names were intuitive and easy to interpret throughout the report.
+
+Next, all variables were formatted according to their statistical type. Categorical variables such as *League*, *Nationality*, and *EU Player* were converted to factors, while numeric variables such as *Age*, *National Caps*, *Total Apps*, *Current Reputation*, and *Salary* were cleaned to remove any non numeric characters such as commas, spaces, currency symbols, and converted to numeric format.
+
+Finally, rows containing any remaining missing values were omitted, resulting in a dataset of 35,161 complete observations. These steps ensured the data was clean, consistent, and ready for hypothesis testing.
+
+All data cleaning and pre processing code, for this is provided in the [Appendix 1.1](#Cleaning).
+
+| Variable | Statistical Type | Description & Justification |
+|-------------------|-------------------|----------------------------------|
+| **League** | Nominal (Categorical) | Represents different football leagues; names of leagues have no inherent numerical order. |
+| **Nationality** | Nominal (Categorical) | Identifies each player's nationality; purely categorical without order or numeric meaning. |
+| **EU Player** | Nominal (Binary) | Indicates EU membership ("Yes"/"No"); a binary categorical variable. |
+| **National Caps** | Ratio (Numeric) | Number of appearances for the national team; true zero point (0 caps = no appearances). |
+| **Total Apps** | Ratio (Numeric) | Total club appearances; count data with meaningful zero. |
+| **Age** | Ratio (Numeric) | Continuous numeric variable with a true zero (age in years). |
+| **Current Reputation** | Interval (Numeric) | Rating variable on a fixed numeric scale (0–10,000); intervals meaningful, ratio not. |
+| **Salary** | Ratio (Numeric) | Continuous numeric measure; a true zero indicates no salary. |
+
+**Table 1**. *Variable Type for our hypothesis.*
+
+## 2.1. Normality Assessment
+
+Before conducting inferential analyses, the continuous variables — **Age, Salary, Current Reputation, Total Apps, and National Caps** — were examined for normality through both **visual inspection** (see *Figure 1* and *Figure 2*) and **statistical assessment of skewness and kurtosis**.
+
+**Age** displayed a near-symmetric distribution (M = 26.16, SD = 4.79) with a skewness of 0.26 and kurtosis of −0.61, both within acceptable limits suggested by *Curran, West, and Finch (1996)*, indicating approximate normality. **Current Reputation** (M = 4760, SD = 1056.71) also approximated a normal distribution, with skewness = 0.09 and kurtosis = 0.34.
+
+In contrast, **Salary** (M = 0.33M €, SD = 1.35) showed substantial positive skew (10.54) and extremely high kurtosis (146.11), suggesting pronounced non-normality driven by a small number of players with disproportionately high earnings. Similarly, **Total Apps** (M = 140.6, SD = 121.9) showed moderate right skew (0.93) and mild kurtosis (0.36), while **National Caps** (M = 5.96, SD = 14.79) displayed strong right skew (4.01) and high kurtosis (20.35), indicating a highly concentrated distribution near zero.
+
+Following the guidance of *Field, Miles, and Field (2012)*, **Age** and **Current Reputation** can be considered approximately normal, whereas **Salary**, **Total Apps**, and **National Caps** deviate substantially from normality. These findings suggest that **parametric tests** are appropriate for normally distributed variables (e.g., Age, Current Reputation), while **non-parametric approaches** may be more suitable for skewed measures such as Salary and National Caps.
+
+Summary statistics (mean, SD, skewness, kurtosis) and detailed code for the normality assessment are provided in [Appendix 1.5](#appendix-normality)**.**
+
+```{r}
+# Sample
+set.seed(120)
+wages_sample <- wages_cleaned[sample(nrow(wages_cleaned), 1000),] # Issues when rendering, solved by saving dataset after cleaning.
+
+wages_sample$Salary_Millions <- wages_sample$Salary / 1e6 # Convert salary to millions
+wages_sample$Reputation_Scaled <- wages_sample$`Current Reputation` / 1000
+
+
+# 1. Age
+hist_age <- ggplot(wages_sample, aes(x = Age)) +
+  geom_histogram(aes(y = after_stat(density)), fill = "grey", colour = "black", bins = 30) +
+  stat_function(fun = dnorm,
+                args = list(mean = mean(wages_sample$Age, na.rm = TRUE),
+                            sd = sd(wages_sample$Age, na.rm = TRUE)),
+                colour = "red") +
+  labs(title = "Age", x = "Player Age", y = "Density")
+
+# 2. Salary in Millions 
+hist_salary <- ggplot(wages_sample, aes(x = Salary_Millions)) +
+  geom_histogram(aes(y = after_stat(density)), fill = "grey", colour = "black", bins = 30) +
+  stat_function(fun = dnorm,
+                args = list(mean = mean(wages_sample$Salary_Millions, na.rm = TRUE),
+                            sd = sd(wages_sample$Salary_Millions, na.rm = TRUE)),
+                colour = "red") +
+  labs(title = "Salary (€ Millions)", x = "Annual Salary (in Millions)", y = "Density")
+
+# 3. Current Reputation
+hist_cr <- ggplot(wages_sample, aes(x = `Current Reputation`)) +
+  geom_histogram(aes(y = after_stat(density)), fill = "grey", colour = "black", bins = 30) +
+  stat_function(fun = dnorm,
+                args = list(mean = mean(wages_sample$`Current Reputation`, na.rm = TRUE),
+                            sd = sd(wages_sample$`Current Reputation`, na.rm = TRUE)),
+                colour = "red") +
+  scale_y_continuous(labels = scales::comma) + # Improved Visualization
+  labs(title = "Current Reputation", x = "Reputation Score", y = "Density")
+
+# 4. Total Apps
+hist_apps <- ggplot(wages_sample, aes(x = `Total Apps`)) +
+  geom_histogram(aes(y = after_stat(density)), fill = "grey", colour = "black", bins = 30) +
+  stat_function(fun = dnorm,
+                args = list(mean = mean(wages_sample$`Total Apps`, na.rm = TRUE),
+                            sd = sd(wages_sample$`Total Apps`, na.rm = TRUE)),
+                colour = "red") +
+  labs(title = "Total Apps", x = "Total Club Appearances", y = "Density")
+
+# 5. National Caps
+hist_caps <- ggplot(wages_sample, aes(x = `National Caps`)) +
+  geom_histogram(aes(y = after_stat(density)), fill = "grey", colour = "black", bins = 30) +
+  stat_function(fun = dnorm,
+                args = list(mean = mean(wages_sample$`National Caps`, na.rm = TRUE),
+                            sd = sd(wages_sample$`National Caps`, na.rm = TRUE)),
+                colour = "red") +
+  labs(title = "National Caps", x = "National Appearances", y = "Density")
+
+# Combine in grid
+grid.arrange(hist_age, hist_salary, hist_cr, hist_apps, hist_caps, ncol = 3)
+```
+
+**Figure 1.** *Histograms for continuous variables showing the distribution of Age, Salary, Current Reputation, Total Apps, and National Caps. Red lines represent the normal density curve.*
+
+```{r}
+par(mfrow = c(2, 3)) 
+
+qqnorm(wages_sample$Age, main = "Q-Q Plot: Age"); qqline(wages_sample$Age, col = 2)
+qqnorm(wages_sample$Salary_Millions, main = "Q-Q Plot: Salary (€M)"); qqline(wages_sample$Salary_Millions, col = 2)
+qqnorm(wages_sample$`Current Reputation`, main = "Q-Q Plot: Current Reputation"); qqline(wages_sample$`Current Reputation`, col = 2)
+qqnorm(wages_sample$`Total Apps`, main = "Q-Q Plot: Total Apps"); qqline(wages_sample$`Total Apps`, col = 2)
+qqnorm(wages_sample$`National Caps`, main = "Q-Q Plot: National Caps"); qqline(wages_sample$`National Caps`, col = 2)
+
+par(mfrow = c(1,1))  # reset layout
+```
+
+**Figure 2.** *Q–Q plots for continuous variables assessing deviations from normality. Points deviating substantially from the red line indicate not normal distributions.*
+
+## 3. Analysis Approach
+
+## 4. Results
+
+## 4.1 Hypothesis title 1
+
+## 4.2 Hypothesis title 2
+
+## 4.3 Hypothesis title 3
+
+## 4.4 Hypothesis title 4
+
+## 5. Discussion
+
+-   **Summarise findings:** What patterns emerged?
+-   **Interpret results:** Why might these differences or relationships exist?
+-   **Discuss limitations:** small sample, sources of bias, etc.
+-   **Implications:**
+
+## 6. Conclusion
+
+## 7. References
+
+Yash. (2024). Football Player Salaries Dataset. Retrieved from www.kaggle.com website: https://www.kaggle.com/datasets/ultimus/football-salaries-dataset
+
+Curran, Patrick J., Stephen G. West, and John F. Finch. (1996). “The robustness of test statistics to nonnormality and specification error in confirmatory factor analysis.”
+
+Field, A., Field Z. & Miles J.(2012). Discovering statistics using IBM SPSS statistics. Sage publications limited.
+
+# Appendix
+
+## 1. Cleaning and fix Dataset {#Cleaning}
+
+### 1.1. Dropping columns
+
+```{r}
+# Dropping columns that are not useful
+wages <- wages |>
+  select(  -name, -club, -position, -based, -begins, -expires, -last.club, -last.trans..fee
+  )
+# Check remaining variables
+colnames(wages)
+```
+
+### 1.2. Renaming columns
+
+```{r}
+# Renaming columns for clarity
+wages <- wages |>
+  dplyr::rename(
+    League            = division,
+    Nationality       = nat,
+    `EU Player`       = eu.national,  
+    `National Caps`   = caps,
+    `Total Apps`      = `at.apps`,
+    Age               = age,
+    `Current Reputation` = cr,
+    Salary            = salary
+  )
+
+colnames(wages)
+```
+
+### 1.3.Omitting columns of useful columns
+
+```{r}
+#removing the rows of our valid columns, since wouldn't contribute to the analyses
+wages <- na.omit(wages)
+colSums(is.na(wages))
+```
+
+### 1.4. Final Pre-Processing: Cleaning Symbols, Spaces, and Converting to Factors
+
+```{r}
+# Removing extra symbols and spaces, and ensuring data behaves as intended by converting variables to factors
+
+wages$League <- as.factor(wages$League)
+wages$Nationality <- as.factor(wages$Nationality)
+
+wages$`EU Player` <- factor(str_trim(wages$`EU Player`), levels = c("No", "Yes")) # Convert to binary
+
+wages$`National Caps` <- as.numeric(wages$`National Caps`) # Convert National Cap  to numeric 
+wages$`Total Apps` <- as.numeric(str_replace_all(wages$`Total Apps`, "[^0-9]", "")) # Clean and convert total apps to numeric
+
+wages$`Current Reputation` <- as.numeric(str_replace_all(wages$`Current Reputation`, ",", "")) # Clean and convert Current reputation to numeric
+
+wages$Salary <- as.numeric(str_replace_all(wages$Salary, "[^0-9]", ""))# Clean and convert salary to numeric
+
+# Strucure and summary
+str(wages)
+```
+
+```{r}
+# Save cleaned dataset
+saveRDS(wages, "wages_cleaned.rds")
+wages_cleaned <- readRDS("wages_cleaned.rds")
+
+head(wages_cleaned, 2)
+```
+
+### 1.5. Normality Assessment for Continuous Variables {#appendix-normality}
+
+```{r}
+# Showing mean, sd, skew, and kurtosis per variable
+# Age
+print("AGE")
+print(summary(wages_sample$Age))
+print(paste("SD:", round(sd(wages_sample$Age, na.rm = TRUE), 2)))
+print(semTools::skew(wages_sample$Age))
+print(semTools::kurtosis(wages_sample$Age))
+
+# Salary already in Millions
+print("SALARY")
+print(summary(wages_sample$Salary_Millions))
+print(paste("SD:", round(sd(wages_sample$Salary_Millions, na.rm = TRUE), 2)))
+print(semTools::skew(wages_sample$Salary_Millions))
+print(semTools::kurtosis(wages_sample$Salary_Millions))
+
+# Current Reputation
+print("CURRENT REPUTATION")
+print(summary(wages_sample$`Current Reputation`))
+print(paste("SD:", round(sd(wages_sample$`Current Reputation`, na.rm = TRUE), 2)))
+print(semTools::skew(wages_sample$`Current Reputation`))
+print(semTools::kurtosis(wages_sample$`Current Reputation`))
+
+# Total Apps
+print("TOTAL APPS")
+print(summary(wages_sample$`Total Apps`))
+print(paste("SD:", round(sd(wages_sample$`Total Apps`, na.rm = TRUE), 2)))
+print(semTools::skew(wages_sample$`Total Apps`))
+print(semTools::kurtosis(wages_sample$`Total Apps`))
+
+# National Caps
+print("NATIONAL CAPS")
+print(summary(wages_sample$`National Caps`))
+print(paste("SD:", round(sd(wages_sample$`National Caps`, na.rm = TRUE), 2)))
+print(semTools::skew(wages_sample$`National Caps`))
+print(semTools::kurtosis(wages_sample$`National Caps`))
+```
