@@ -110,8 +110,8 @@ To address these aims, four hypotheses were developed (see Table 1). Each hypoth
 |------------------|------------------------|------------------------------|
 | **Current Reputation and Salary** | A player’s current reputation is **not related** to their salary. | A player’s current reputation is **positively related** to their salary. |
 | **EU Status and Salary** | Being an EU player **does not affect** a player’s salary. | Being an EU player **does affect** a player’s salary. |
-| **League and Salary** | Average salaries **do not differ** across football leagues. | Average salaries **differ** across football leagues. |
-| **EU Status and High Salary** | EU status and being a high earning player are unrelated . | EU status and being a high-earning player are **related**. |
+| **League and Salary** | Average salaries **are not different** across football leagues. | Average salaries **are different** across football leagues. |
+| **EU Status and League** | EU status and league are **unrelated**. | EU status and league are **related**. |
 :::
 
 Section 2 describes the dataset and data preparation steps, including missing value treatment, variable cleaning, and normality assessment. Section 3 outlines the analytic approach, detailing the statistical rationale and effect size conventions. Section 4 presents the results by hypothesis, followed by discussion and conclusions in Sections 5 and 6.
@@ -157,18 +157,18 @@ All data cleaning and pre processing code, for this is provided in the [Appendix
 
 | Variable | Statistical Type | Description & Justification |
 |-------------------|-------------------|----------------------------------|
-| **League** | Nominal (Categorical) | Represents different football leagues; names of leagues have no inherent numerical order. |
-| **Nationality** | Nominal (Categorical) | Identifies each player's nationality; purely categorical without order or numeric meaning. |
-| **EU Player** | Nominal (Binary) | Indicates EU membership ("Yes"/"No"); a binary categorical variable. |
-| **National Caps** | Ratio (Numeric) | Number of appearances for the national team; true zero point (0 caps = no appearances). |
-| **Total Apps** | Ratio (Numeric) | Total club appearances; count data with meaningful zero. |
-| **Age** | Ratio (Numeric) | Continuous numeric variable with a true zero (age in years). |
+| **League** | Nominal | Represents different football leagues; names of leagues have no inherent numerical order. |
+| **Nationality** | Nominal | Identifies each player's nationality; purely categorical without order or numeric meaning. |
+| **EU Player** | Binary | Indicates EU membership ("Yes"/"No"); a binary categorical variable. |
+| **National Caps** | Numeric | Number of appearances for the national team; true zero point (0 caps = no appearances). |
+| **Total Apps** | Numeric | Total club appearances; count data with meaningful zero. |
+| **Age** | Numeric | Continuous numeric variable with a true zero (age in years). |
 | **Current Reputation** | Interval (Numeric) | Rating variable on a fixed numeric scale (0–10,000); intervals meaningful, ratio not. |
-| **Salary** | Ratio (Numeric) | Continuous numeric measure; a true zero indicates no salary. |
+| **Salary** | Numeric | Continuous numeric measure; a true zero indicates no salary. |
 
 **Table 1**. *Variable Type for our hypothesis.*
 
-## 2.1. Normality Assessment
+### 2.1. Normality Assessment
 
 Before conducting inferential analyses, the continuous variables — **Age, Salary, Current Reputation, Total Apps, and National Caps** — were examined for normality through both **visual inspection** (see *Figure 1* and *Figure 2*) and **statistical assessment of skewness and kurtosis**.
 
@@ -181,6 +181,8 @@ Following the guidance of *Field, Miles, and Field (2012)*, **Age** and **Curren
 Summary statistics (mean, SD, skewness, kurtosis) and detailed code for the normality assessment are provided in [Appendix 1.5](#appendix-normality)**.**
 
 ```{r}
+#| fig.cap: "Figure 1. Histograms for continuous variables showing the distribution of Age, Salary, Current Reputation, Total Apps, and National Caps. Red lines represent the normal density curve."
+
 # Sample
 set.seed(120)
 wages_sample <- wages_cleaned[sample(nrow(wages_cleaned), 1000),] # Issues when rendering, solved by saving dataset after cleaning.
@@ -239,9 +241,9 @@ hist_caps <- ggplot(wages_sample, aes(x = `National Caps`)) +
 grid.arrange(hist_age, hist_salary, hist_cr, hist_apps, hist_caps, ncol = 3)
 ```
 
-**Figure 1.** *Histograms for continuous variables showing the distribution of Age, Salary, Current Reputation, Total Apps, and National Caps. Red lines represent the normal density curve.*
-
 ```{r}
+#| fig.cap: "Figure 2. Q–Q plots for continuous variables assessing deviations from normality. Points deviating substantially from the red line indicate not normal distributions."
+
 par(mfrow = c(2, 3)) 
 
 qqnorm(wages_sample$Age, main = "Q-Q Plot: Age"); qqline(wages_sample$Age, col = 2)
@@ -253,28 +255,144 @@ qqnorm(wages_sample$`National Caps`, main = "Q-Q Plot: National Caps"); qqline(w
 par(mfrow = c(1,1))  # reset layout
 ```
 
-**Figure 2.** *Q–Q plots for continuous variables assessing deviations from normality. Points deviating substantially from the red line indicate not normal distributions.*
-
 ## 3. Analysis Approach
+
+An alpha level of **.05** was adopted as the threshold for statistical significance, in line with conventional standards in social and behavioral research. Results with *p* values less than .05 were considered statistically significant. To provide a fuller understanding of the results, effect sizes were reported alongside *p* values to assess the practical significance of findings.
+
+The type of statistical test applied to each hypothesis was determined by the scale of measurement of the variables and their distributional properties. As outlined in Section 2.2, only *Age* and *Current Reputation* approximated a normal distribution, while *Salary*, *Total Apps*, and *National Caps* did not meet the assumptions of normality. Therefore, non-parametric tests were used for analyses involving these variables.
+
+-   For relationships between two continuous variables, **Spearman’s Rank-Order Correlation** was selected, as it does not assume normality. (Both variables are continuous, but normality in salary is not met)
+
+-   When comparing a continuous variable across a **binary categorical variable**, the **Mann–Whitney U test** was applied. (Comparing a continuous non-normal variable across two groups.)
+
+-   To compare a continuous variable across **multiple groups**, a **Kruskal–Wallis test** was used. (Continuous non-normal variable compared across 3+ groups, since leagues are multi-category nominal).
+
+-   Finally, relationships between two **nominal variables** were examined using a **Chi-square test of independence**. (For two nominal variables)
+
+Effect sizes were interpreted according to conventional benchmarks. For correlational analyses, Spearman’s ρ values of approximately .10, .30, and .50 represent small, medium, and large associations, respectively (Cohen, 1988). For group comparisons, η² values of .01, .06, and .14 were considered small, medium, and large effects. For Chi-square tests, **Cramér’s V** values of .07, .21, and .35 represent small, medium, and large associations, respectively.
+
+Reporting both statistical significance and effect size provides a comprehensive understanding of the magnitude and practical importance of observed effects.
+
+Table 3. Overview of Planned Statistical Analyses
+
+| **Analysis Focus**           | **Test Type**                   |
+|------------------------------|---------------------------------|
+| Salary vs Current Reputation | Spearman’s Rank Correlation     |
+| Salary vs EU Player          | Mann–Whitney U Test             |
+| Salary vs League             | Kruskal–Wallis H Test           |
+| EU Player vs League          | Chi-square Test of Independence |
 
 ## 4. Results
 
-## 4.1 Hypothesis title 1
+### 4.1 Relationship between Salary and Current *Reputation*
 
-## 4.2 Hypothesis title 2
+H0: There is no relationship between a player’s Current Reputation and their Salary.
 
-## 4.3 Hypothesis title 3
+H1: There is a relationship between a player’s Current Reputation and their Salary.
 
-## 4.4 Hypothesis title 4
+The association between players’ Current Reputation and Salary was examined using a Spearman’s rank order correlation, as Salary was not normally distributed. The results indicated a strong positive relationship, r = 0.84, n = 35,161, p \< .001 [Results](#Test1) This suggests that higher reputation scores are strongly associated with higher salaries.
+
+Therefore, there is sufficient evidence to reject the null hypothesis in favour of the alternative. In practical terms, players with greater reputation values tend to earn substantially higher salaries, highlighting the strong link between perceived skill level and financial reward within professional football.
+
+```{r message=FALSE}
+#| label: corr-scatter
+#| fig.cap: "Figure 3. Scatterplot showing the relationship between Current Reputation and Salary among players"
+
+#To avoid extreme outliers I used a log sclale on the y-axis to reduce the exteme salary outliers
+scatter <- ggplot(wages_cleaned, aes(x = `Current Reputation`, y = Salary)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", colour = "red", se = FALSE) +
+  scale_y_log10(labels = scales::comma) +
+  labs(
+    x = "Current Reputation Score",
+    y = "Player Salary (scaled)",
+    title = "Scatterplot of Salary and Current Reputation"
+  ) 
+
+scatter
+```
+
+### 4.2 Difference in Salary between EU and non-EU players
+
+H0: There is no difference in Salary between EU and Non-EU players.
+H1: There is a difference in Salary between EU and Non-EU players.
+
+A Mann–Whitney U test was performed to examine salary differences between EU and Non-EU players. The results indicated a statistically significant difference W = 135,551,244, p \< .001 [Results](#Test2) suggesting that the two groups differ in their salary distributions.
+
+Therefore, the null hypothesis was rejected in favour of the alternative. Non-EU players appear to earn higher salaries on average compared to EU players, which may reflect differences in international market value or global visibility.
+
+While the Mann–Whitney test is robust to outliers, it is important to note that a small number of exceptionally high salaries among elite non EU players may have amplified this effect. Consequently, the observed difference likely reflects both genuine group level differences and the influence of these extreme cases.
+
+```{r}
+#| label: Box-Plot - Salary Between EU and Non-EU
+#| fig.cap: "Figure 5. Boxplot comparing salaries between EU and Non-EU players"
+# The log transformation was applied to improve visualization due to the highly skewed salary distribution.
+
+ggplot(wages_cleaned, aes(x = `EU Player`, y = Salary, fill = `EU Player`)) +
+  geom_boxplot(outlier.color = "red", alpha = 0.6) +
+  scale_y_log10(labels = scales::comma) +
+  labs(
+    title = "Salary Comparison between EU and Non-EU Players",
+    x = "EU Player Status",
+    y = "Salary €"
+  ) +
+  
+  theme(legend.position = "none")
+
+```
+
+### 4.3 Difference in Salary across different Leagues
+
+H0: Average salaries are not different across football leagues.
+H1: Average salaries are different across football leagues.
+
+A Kruskal–Wallis H test was conducted to compare player salaries across five football leagues: Premier League, LaLiga EA SPORTS, Bundesliga, Ligue 1 Uber Eats, and Other Leagues. This non-parametric test was chosen because salary distributions were highly skewed and did not meet the assumptions of normality required for ANOVA.
+
+The results of the test indicated a statistically significant difference in salary distributions among the leagues, χ²(4, N = 35,161) = 3390.6, p \< .001 [results](#Test3) .This suggests that player salaries vary significantly across leagues. Therefore, the null hypothesis H0 is rejected, providing evidence that average salaries differ significantly across football leagues.
+
+As shown in Figure 6 , players in the Premier League tend to have the highest median salaries, followed by those in LaLiga and the Bundesliga, while players in other leagues generally earn less on average although we can observe some extreme outliers.
+
+```{r}
+#| label: Box-Plot - Player salaries by football league
+#| fig.cap: "Boxplot of player salaries by football league"
+# The log transformation was applied to improve visualization due to the highly skewed salary distribution.
+
+ggplot(wages_cleaned, aes(x = League, y = Salary)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  scale_y_log10(labels = scales::label_number()) +
+  labs(
+    title = "Salary by League Group",
+    x = "League Group",
+    y = "Salary €"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 25, hjust = 1))
+```
+
+### 4.4 Relationship between Nationality region and League 
+
+H0: EU status and league are unrelated
+H1: EU status and league are related.
+
+A Chi-square test of independence was conducted to examine the relationship between a player’s EU membership status (“Yes” or “No”) and the league in which they play (Premier League, LaLiga EA SPORTS, Bundesliga, Ligue 1 Uber Eats, and Other Leagues). The test revealed a statistically significant association between EU status and league, χ²(4, N = 35,161) = 577.50, p \< .001. This indicates that the proportion of EU and non-EU players differs significantly across leagues.
+
+Inspection of the standardised residuals presented in the Chi-square Test of Independence [Table](#test4) suggests that non-EU players are overrepresented in the Premier League and underrepresented in most European leagues, while EU players are more common in LaLiga and the Bundesliga. Therefore, the null hypothesis is rejected, providing evidence that EU status and league are associated.
 
 ## 5. Discussion
 
--   **Summarise findings:** What patterns emerged?
--   **Interpret results:** Why might these differences or relationships exist?
--   **Discuss limitations:** small sample, sources of bias, etc.
--   **Implications:**
+The aim of this analysis was to examine factors associated with professional football players’ salaries, focusing on current reputation, EU membership, and league affiliation. Across all four analyses, statistically significant relationships were found, revealing consistent patterns in how player attributes and league context influence earnings.
+
+The strong positive association between reputation and salary indicates that higher-reputation players earn more, reflecting how performance history and market value drive wages in professional football. Similarly, EU membership was significantly related to salary, suggesting that labour mobility and transfer regulations within Europe may advantage EU players in securing higher-paying contracts.
+
+Salary levels also differed significantly across leagues, with Premier League players earning the highest median wages, followed by those in LaLiga and the Bundesliga. This pattern aligns with the financial structure of modern football, where the Premier League’s commercial dominance supports larger salary budgets. Furthermore, the Chi-square test confirmed that EU status and league are not independent, as non-EU players are overrepresented in the Premier League, while EU players are more common in continental European leagues — likely reflecting geographical and recruitment factors.
+
+Although all results were statistically significant (p \< .001), the large sample size (N = 35,161) means that even small differences can appear significant. Visual inspection and effect sizes therefore provide a more realistic measure of the relationships observed. Limitations include possible inconsistencies in salary reporting and the absence of variables such as position, experience, or club revenue, which could further explain variation in earnings.
 
 ## 6. Conclusion
+
+This analysis examined whether player reputation, EU membership, and league affiliation were associated with differences in salary among professional football players. The results indicated significant relationships across all analyses: higher-reputation players earned greater salaries, EU membership was linked to salary differences, and wages varied notably across leagues, with the Premier League showing the highest earnings. In addition, EU status and league were found to be associated, reflecting distinct patterns in player distribution across European and non-European competitions.
+
+Overall, these findings highlight how both player characteristics and structural factors within professional football contribute to salary disparities. While statistical significance was influenced by the large sample size, the observed trends align with real-world economic and regulatory dynamics of the sport. Future research could expand on this work by incorporating variables such as player position, experience, and club revenue to better explain salary variation and deepen understanding of wage inequality in global football.
 
 ## 7. References
 
@@ -318,7 +436,7 @@ wages <- wages |>
 colnames(wages)
 ```
 
-### 1.3.Omitting columns of useful columns
+### 1.3. Omitting columns of useful columns
 
 ```{r}
 #removing the rows of our valid columns, since wouldn't contribute to the analyses
@@ -329,9 +447,21 @@ colSums(is.na(wages))
 ### 1.4. Final Pre-Processing: Cleaning Symbols, Spaces, and Converting to Factors
 
 ```{r}
+
+# I had 754 different leagues, so in order to correct this I scaled down to the most important ones and separate the rest as "others"
+top_leagues <- c("Premier League", "LALIGA EA SPORTS", "Bundesliga",
+                 "Serie A", "Ligue 1 Uber Eats", "Rosh Saudi League")
+
+# Recode leagues into groups
+wages$League <- ifelse(wages$League %in% top_leagues,
+                            wages$League,
+                            "Other Leagues")
+
+
 # Removing extra symbols and spaces, and ensuring data behaves as intended by converting variables to factors
 
-wages$League <- as.factor(wages$League)
+wages$League <- as.factor(str_trim(wages$League))
+
 wages$Nationality <- as.factor(wages$Nationality)
 
 wages$`EU Player` <- factor(str_trim(wages$`EU Player`), levels = c("No", "Yes")) # Convert to binary
@@ -393,4 +523,61 @@ print(summary(wages_sample$`National Caps`))
 print(paste("SD:", round(sd(wages_sample$`National Caps`, na.rm = TRUE), 2)))
 print(semTools::skew(wages_sample$`National Caps`))
 print(semTools::kurtosis(wages_sample$`National Caps`))
+```
+
+## 2. Statistical Tests
+
+### 2.1. Spearman’s Rank-Order Correlation (Salary and Current Reputation) {#Test1}
+
+```{r}
+cor_test <- cor.test( wages_cleaned$Salary, wages_cleaned$`Current Reputation`, method = "spearman", exact = FALSE
+)
+cor_test
+```
+
+### 2.2. Mann–Whitney U Test (Salary by EU vs Non-EU Players) {#Test2}
+
+```{r}
+# Mann–Whitney U test: comparing salaries between EU and Non-EU players
+mw_test <- wilcox.test(Salary ~ `EU Player`, data = wages_cleaned, exact = FALSE)
+
+mw_test
+
+# Extract key values for report
+W <- mw_test$statistic
+pval <- format.pval(mw_test$p.value, digits = 3)
+cat("W =", W, ", p-value =", pval)
+
+```
+
+### 2.3. Kruskal–Wallis Test (Salary Across Leagues) {#Test3}
+
+```{r}
+
+# Check distribution
+table(wages_cleaned$League)
+
+# Run Kruskal–Wallis again
+kruskal_test <- kruskal.test(Salary ~ League, data = wages_cleaned)
+kruskal_test
+```
+
+### 2.4. Chi-Square Test of Independence (Nationality Region and League)  {#test4}
+
+```{r}
+# Remove rows with missing values just in case
+wages_c <- wages %>%
+  filter(!is.na(`EU Player`) & !is.na(League))
+
+# Run SPSS-style Chi-square CrossTable
+gmodels::CrossTable(
+    wages_c$League,
+
+  wages_c$`EU Player`,
+  chisq = TRUE,        # Chi-square test only
+  expected = TRUE,     # Show expected values
+  sresid = TRUE,       # Show standardized residuals
+  format = "SPSS"      # SPSS-style output
+)
+
 ```
